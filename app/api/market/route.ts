@@ -39,7 +39,8 @@ export async function GET(req: NextRequest) {
       { candles, stats, source: 'live' },
       { headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=30' } }
     )
-  } catch {
+  } catch (err) {
+    console.error('[market] CoinGecko failed, falling back to SIM:', err)
     const seedPrice = FALLBACK_PRICES[asset] ?? 1000
     const { intervalSeconds, count } = simParams(timeframe)
     const candles = generateSimCandles(seedPrice, count, intervalSeconds)
