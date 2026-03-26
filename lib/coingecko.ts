@@ -1,33 +1,43 @@
 import { Asset, Candle, MarketStats, ASSET_IDS } from '../types/market'
 
-const BASE = 'https://api.coingecko.com/api/v3'
+// Prices via CoinMarketCap (authenticated, reliable)
+const CMC_BASE = 'https://pro-api.coinmarketcap.com/v1'
+
+// OHLCV via CoinGecko (free tier, no OHLCV on CMC free plan)
+const CG_BASE = 'https://api.coingecko.com/api/v3'
 
 function cgHeaders(): HeadersInit {
-  const headers: Record<string, string> = {
+  return {
     'Accept': 'application/json',
     'User-Agent': 'CryptoTerminal/1.0',
   }
-  if (process.env.COINGECKO_API_KEY) {
-    headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY
+}
+
+function cmcHeaders(): HeadersInit {
+  return {
+    'Accept': 'application/json',
+    'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API_KEY ?? '',
   }
-  return headers
 }
 
 export async function fetchPrice(assets: Asset[]): Promise<Record<Asset, MarketStats>> {
-  const ids = assets.map(a => ASSET_IDS[a]).join(',')
-  const url = `${BASE}/simple/price?ids=${ids}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`
-  const res = await fetch(url, { next: { revalidate: 60 }, headers: cgHeaders() })
-  if (!res.ok) throw new Error(`CoinGecko price ${res.status}: ${await res.text()}`)
-  const data = await res.json()
+  const symbols = assets.join(',')
+  const url = `${CMC_BASE}/cryptocurrency/quotes/latest?symbol=${symbols}&convert=USD`
+  const res = await fetch(url, { next: { revalidate: 60 }, headers: cmcHeaders() })
+  if (!res.ok) throw new Error(`CMC price ${res.status}: ${await res.text()}`)
+  const json = await res.json()
   const result = {} as Record<Asset, MarketStats>
   for (const asset of assets) {
-    const d = data[ASSET_IDS[asset]]
+    // CMC returns an array per symbol; first entry is the canonical asset
+    const entries = json.data?.[asset]
+    const d = Array.isArray(entries) ? entries[0] : entries
     if (!d) continue
+    const q = d.quote?.USD
     result[asset] = {
-      price: d.usd,
-      change24h: d.usd_24h_change ?? 0,
-      volume24h: d.usd_24h_vol ?? 0,
-      marketCap: d.usd_market_cap ?? 0,
+      price: q?.price ?? 0,
+      change24h: q?.percent_change_24h ?? 0,
+      volume24h: q?.volume_24h ?? 0,
+      marketCap: q?.market_cap ?? 0,
     }
   }
   return result
@@ -35,7 +45,7 @@ export async function fetchPrice(assets: Asset[]): Promise<Record<Asset, MarketS
 
 export async function fetchOHLCV(asset: Asset, days: number): Promise<Candle[]> {
   const id = ASSET_IDS[asset]
-  const url = `${BASE}/coins/${id}/ohlc?vs_currency=usd&days=${days}`
+  const url = `${CG_BASE}/coins/${id}/ohlc?vs_currency=usd&days=${days}`
   const res = await fetch(url, { next: { revalidate: 300 }, headers: cgHeaders() })
   if (!res.ok) throw new Error(`CoinGecko OHLCV ${res.status}: ${await res.text()}`)
   const raw: [number, number, number, number, number][] = await res.json()
