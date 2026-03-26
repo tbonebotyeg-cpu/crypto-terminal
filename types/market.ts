@@ -34,17 +34,33 @@ export const ASSET_IDS: Record<Asset, string> = {
   XRP: 'ripple',
 }
 
-export const TIMEFRAME_DAYS: Record<Timeframe, number> = {
-  '15m': 1,
-  '1H': 2,
-  '4H': 14,
-  '1D': 90,
-  '1W': 365,
-  '1M': 365,
+export const BINANCE_SYMBOLS: Record<Asset, string> = {
+  BTC: 'BTCUSDT',
+  ETH: 'ETHUSDT',
+  SOL: 'SOLUSDT',
+  XRP: 'XRPUSDT',
+}
+
+export const BINANCE_INTERVALS: Record<Timeframe, string> = {
+  '15m': '15m',
+  '1H': '1h',
+  '4H': '4h',
+  '1D': '1d',
+  '1W': '1w',
+  '1M': '1M',
+}
+
+export const BINANCE_LIMITS: Record<Timeframe, number> = {
+  '15m': 200,
+  '1H': 200,
+  '4H': 200,
+  '1D': 200,
+  '1W': 100,
+  '1M': 48,
 }
 
 export const TIMEFRAME_LABELS: Record<Timeframe, string> = {
-  '15m': '30m*',  // CoinGecko free tier returns 30m candles for days=1
+  '15m': '15m',
   '1H': '1H',
   '4H': '4H',
   '1D': '1D',

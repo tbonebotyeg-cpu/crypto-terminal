@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchPrice, fetchOHLCV } from '../../../lib/coingecko'
 import { generateSimCandles, simParams, FALLBACK_PRICES } from '../../../lib/simulator'
-import { resampleCandles } from '../../../lib/utils'
-import { Asset, Timeframe, TIMEFRAME_DAYS } from '../../../types/market'
+import { Asset, Timeframe } from '../../../types/market'
 
 export const runtime = 'nodejs'
 
@@ -11,17 +10,11 @@ export async function GET(req: NextRequest) {
   const asset = (searchParams.get('asset') ?? 'BTC') as Asset
   const timeframe = (searchParams.get('timeframe') ?? '1H') as Timeframe
 
-  const days = TIMEFRAME_DAYS[timeframe] ?? 2
-
   try {
-    const [statsMap, rawCandles] = await Promise.all([
+    const [statsMap, candles] = await Promise.all([
       fetchPrice([asset]),
-      fetchOHLCV(asset, days),
+      fetchOHLCV(asset, timeframe),
     ])
-
-    let candles = rawCandles
-    if (timeframe === '1W') candles = resampleCandles(rawCandles, 'week')
-    if (timeframe === '1M') candles = resampleCandles(rawCandles, 'month')
 
     const stats = statsMap[asset] ?? {
       price: candles[candles.length - 1]?.close ?? 0,
@@ -40,7 +33,7 @@ export async function GET(req: NextRequest) {
       { headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=30' } }
     )
   } catch (err) {
-    console.error('[market] CoinGecko failed, falling back to SIM:', err)
+    console.error('[market] data fetch failed, falling back to SIM:', err)
     const seedPrice = FALLBACK_PRICES[asset] ?? 1000
     const { intervalSeconds, count } = simParams(timeframe)
     const candles = generateSimCandles(seedPrice, count, intervalSeconds)

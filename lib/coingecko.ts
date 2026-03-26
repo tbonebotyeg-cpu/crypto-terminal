@@ -1,17 +1,7 @@
-import { Asset, Candle, MarketStats, ASSET_IDS } from '../types/market'
+import { Asset, Candle, MarketStats, Timeframe, BINANCE_SYMBOLS, BINANCE_INTERVALS, BINANCE_LIMITS } from '../types/market'
 
 // Prices via CoinMarketCap (authenticated, reliable)
 const CMC_BASE = 'https://pro-api.coinmarketcap.com/v1'
-
-// OHLCV via CoinGecko (free tier, no OHLCV on CMC free plan)
-const CG_BASE = 'https://api.coingecko.com/api/v3'
-
-function cgHeaders(): HeadersInit {
-  return {
-    'Accept': 'application/json',
-    'User-Agent': 'CryptoTerminal/1.0',
-  }
-}
 
 function cmcHeaders(): HeadersInit {
   return {
@@ -43,19 +33,21 @@ export async function fetchPrice(assets: Asset[]): Promise<Record<Asset, MarketS
   return result
 }
 
-export async function fetchOHLCV(asset: Asset, days: number): Promise<Candle[]> {
-  const id = ASSET_IDS[asset]
-  const url = `${CG_BASE}/coins/${id}/ohlc?vs_currency=usd&days=${days}`
-  const res = await fetch(url, { next: { revalidate: 300 }, headers: cgHeaders() })
-  if (!res.ok) throw new Error(`CoinGecko OHLCV ${res.status}: ${await res.text()}`)
-  const raw: [number, number, number, number, number][] = await res.json()
-  // CoinGecko returns [timestamp_ms, open, high, low, close] — no volume
-  return raw.map(([ts, o, h, l, c]) => ({
-    time: Math.floor(ts / 1000),
-    open: o,
-    high: h,
-    low: l,
-    close: c,
-    volume: 0,
+export async function fetchOHLCV(asset: Asset, timeframe: Timeframe): Promise<Candle[]> {
+  const symbol = BINANCE_SYMBOLS[asset]
+  const interval = BINANCE_INTERVALS[timeframe]
+  const limit = BINANCE_LIMITS[timeframe]
+  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
+  const res = await fetch(url, { next: { revalidate: 60 } })
+  if (!res.ok) throw new Error(`Binance OHLCV ${res.status}: ${await res.text()}`)
+  // Binance returns [openTime, open, high, low, close, volume, ...]
+  const raw: string[][] = await res.json()
+  return raw.map(k => ({
+    time: Math.floor(Number(k[0]) / 1000),
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5]),
   }))
 }
