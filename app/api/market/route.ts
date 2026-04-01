@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchPrice, fetchOHLCV } from '../../../lib/coingecko'
-import { generateSimCandles, simParams, FALLBACK_PRICES } from '../../../lib/simulator'
-import { Asset, Timeframe } from '../../../types/market'
+import { fetchYahooPrice, fetchYahooOHLCV } from '../../../lib/yahoo'
+import { generateSimCandles, simParams } from '../../../lib/simulator'
+import { Asset, Timeframe, ASSET_REGISTRY, MarketStats, Candle } from '../../../types/market'
 
 export const runtime = 'nodejs'
 
@@ -9,18 +10,35 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const asset = (searchParams.get('asset') ?? 'BTC') as Asset
   const timeframe = (searchParams.get('timeframe') ?? '1H') as Timeframe
+  const config = ASSET_REGISTRY[asset]
+
+  if (!config) {
+    return NextResponse.json({ error: 'Unknown asset' }, { status: 400 })
+  }
 
   try {
-    const [statsMap, candles] = await Promise.all([
-      fetchPrice([asset]),
-      fetchOHLCV(asset, timeframe),
-    ])
+    let stats: MarketStats
+    let candles: Candle[]
 
-    const stats = statsMap[asset] ?? {
-      price: candles[candles.length - 1]?.close ?? 0,
-      change24h: 0, volume24h: 0, marketCap: 0,
+    if (config.provider === 'crypto_com') {
+      const [statsMap, candleData] = await Promise.all([
+        fetchPrice([asset]),
+        fetchOHLCV(asset, timeframe),
+      ])
+      stats = statsMap[asset] ?? { price: 0, change24h: 0, volume24h: 0, marketCap: 0 }
+      candles = candleData
+    } else if (config.provider === 'yahoo') {
+      const [yahooStats, candleData] = await Promise.all([
+        fetchYahooPrice(config.instrumentName),
+        fetchYahooOHLCV(config.instrumentName, timeframe),
+      ])
+      stats = yahooStats
+      candles = candleData
+    } else {
+      throw new Error('Unknown provider')
     }
 
+    // Snap last candle close to live price
     if (candles.length && stats.price) {
       candles[candles.length - 1] = {
         ...candles[candles.length - 1],
@@ -33,8 +51,8 @@ export async function GET(req: NextRequest) {
       { headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=30' } }
     )
   } catch (err) {
-    console.error('[market] data fetch failed, falling back to SIM:', err)
-    const seedPrice = FALLBACK_PRICES[asset] ?? 1000
+    console.error(`[market] ${asset} fetch failed, falling back to SIM:`, err)
+    const seedPrice = config.fallbackPrice
     const { intervalSeconds, count } = simParams(timeframe)
     const candles = generateSimCandles(seedPrice, count, intervalSeconds)
 

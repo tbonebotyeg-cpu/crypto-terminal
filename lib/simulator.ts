@@ -63,11 +63,3 @@ export function simParams(timeframe: string): { intervalSeconds: number; count: 
     default:    return { intervalSeconds: 3600, count: 200 }
   }
 }
-
-// Seed prices for each asset when no live data is available
-export const FALLBACK_PRICES: Record<string, number> = {
-  BTC: 85000,
-  ETH: 3200,
-  SOL: 175,
-  XRP: 0.55,
-}

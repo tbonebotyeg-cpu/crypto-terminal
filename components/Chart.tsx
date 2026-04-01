@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { Candle } from '../types/market'
 import { IndicatorResult } from '../types/indicators'
 import { TradeSetup } from '../types/signals'
@@ -11,25 +11,69 @@ interface Props {
   setups: TradeSetup[]
   alertPrices?: number[]
   currentPrice?: number
+  asset?: string
+}
+
+// Shared types for chart objects
+type ChartApi = {
+  addSeries: (def: unknown, opts: unknown) => SeriesApi
+  priceScale: (id: string) => { applyOptions: (o: unknown) => void }
+  timeScale: () => { fitContent: () => void }
+  applyOptions: (o: unknown) => void
+  remove: () => void
+  removeSeries: (s: unknown) => void
+}
+type SeriesApi = {
+  setData: (d: unknown) => void
+  update: (d: unknown) => void
+  createPriceLine: (opts: unknown) => unknown
+  removePriceLine: (line: unknown) => void
 }
 
 export default function Chart({ candles, results, setups, alertPrices = [] }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const chartRef = useRef<unknown>(null)
-  const candleSeriesRef = useRef<unknown>(null)
-  const volumeSeriesRef = useRef<unknown>(null)
-  const overlaySeriesRef = useRef<Map<string, unknown>>(new Map())
-  const priceLinesRef = useRef<{ series: unknown; line: unknown }[]>([])
+  const chartRef = useRef<ChartApi | null>(null)
+  const candleSeriesRef = useRef<SeriesApi | null>(null)
+  const volumeSeriesRef = useRef<SeriesApi | null>(null)
+  const overlaySeriesRef = useRef<Map<string, SeriesApi>>(new Map())
+  const priceLinesRef = useRef<{ series: SeriesApi; line: unknown }[]>([])
   const prevCandleLengthRef = useRef(0)
-  const initializedRef = useRef(false)
+  const prevFirstTimeRef = useRef(0)
+  const lwsLineSeriesRef = useRef<unknown>(null)
+  const candlesRef = useRef<Candle[]>([])
+
+  // Keep candlesRef in sync
+  candlesRef.current = candles
+
+  const applyCandles = useCallback((candleData: Candle[]) => {
+    if (!candleSeriesRef.current || !candleData.length) return
+    const formatted = candleData.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }))
+    const volumes = candleData.map(c => ({ time: c.time, value: c.volume, color: c.close >= c.open ? '#10b98130' : '#ef444430' }))
+
+    const firstTime = candleData[0].time
+    const isNewSeries = candleData.length !== prevCandleLengthRef.current
+      || prevCandleLengthRef.current === 0
+      || firstTime !== prevFirstTimeRef.current
+
+    if (isNewSeries) {
+      candleSeriesRef.current.setData(formatted)
+      volumeSeriesRef.current?.setData(volumes)
+      prevCandleLengthRef.current = candleData.length
+      prevFirstTimeRef.current = firstTime
+      chartRef.current?.timeScale().fitContent()
+    } else {
+      candleSeriesRef.current.update(formatted[formatted.length - 1])
+      if (volumes.length) volumeSeriesRef.current?.update(volumes[volumes.length - 1])
+    }
+  }, [])
 
   // Init chart once
   useEffect(() => {
-    if (!containerRef.current || initializedRef.current) return
-    initializedRef.current = true
+    if (!containerRef.current) return
+    let disposed = false
 
     import('lightweight-charts').then(({ createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries, LineSeries: LWSLineSeries }) => {
-      if (!containerRef.current) return
+      if (disposed || !containerRef.current) return
 
       const chart = createChart(containerRef.current, {
         layout: {
@@ -47,7 +91,6 @@ export default function Chart({ candles, results, setups, alertPrices = [] }: Pr
         height: containerRef.current.clientHeight,
       })
 
-      // v5 API: chart.addSeries(SeriesDefinition, options)
       const candleSeries = chart.addSeries(CandlestickSeries, {
         upColor: '#10b981',
         downColor: '#ef4444',
@@ -62,12 +105,16 @@ export default function Chart({ candles, results, setups, alertPrices = [] }: Pr
         priceScaleId: 'volume',
       })
       chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } })
-      // Store LineSeries constructor for EMA overlays
-      ;(chartRef as unknown as { lwsLineSeries: unknown }).lwsLineSeries = LWSLineSeries
 
-      chartRef.current = chart
-      candleSeriesRef.current = candleSeries
-      volumeSeriesRef.current = volumeSeries
+      chartRef.current = chart as unknown as ChartApi
+      candleSeriesRef.current = candleSeries as unknown as SeriesApi
+      volumeSeriesRef.current = volumeSeries as unknown as SeriesApi
+      lwsLineSeriesRef.current = LWSLineSeries
+
+      // Apply any candles that arrived before chart was ready
+      if (candlesRef.current.length) {
+        applyCandles(candlesRef.current)
+      }
 
       const ro = new ResizeObserver(() => {
         if (containerRef.current) {
@@ -81,9 +128,9 @@ export default function Chart({ candles, results, setups, alertPrices = [] }: Pr
     })
 
     return () => {
-      initializedRef.current = false
+      disposed = true
       if (chartRef.current) {
-        (chartRef.current as { remove: () => void }).remove()
+        chartRef.current.remove()
         chartRef.current = null
         candleSeriesRef.current = null
         volumeSeriesRef.current = null
@@ -92,44 +139,33 @@ export default function Chart({ candles, results, setups, alertPrices = [] }: Pr
         prevCandleLengthRef.current = 0
       }
     }
-  }, [])
+  }, [applyCandles])
 
-  // Update candles
+  // Update candles when new data arrives
   useEffect(() => {
-    if (!candleSeriesRef.current || !candles.length) return
-    const series = candleSeriesRef.current as {
-      setData: (d: unknown) => void
-      update: (d: unknown) => void
-    }
-    const volSeries = volumeSeriesRef.current as {
-      setData: (d: unknown) => void
-      update: (d: unknown) => void
-    } | null
+    applyCandles(candles)
+  }, [candles, applyCandles])
 
-    const formatted = candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }))
-    const volumes = candles.map(c => ({ time: c.time, value: c.volume, color: c.close >= c.open ? '#10b98130' : '#ef444430' }))
+  // EMA overlays — clear and rebuild when asset changes (detected by price range shift)
+  const lastPriceRangeRef = useRef(0)
 
-    if (candles.length !== prevCandleLengthRef.current || prevCandleLengthRef.current === 0) {
-      series.setData(formatted)
-      if (volSeries) volSeries.setData(volumes)
-      prevCandleLengthRef.current = candles.length
-    } else {
-      series.update(formatted[formatted.length - 1])
-      if (volSeries && volumes.length) volSeries.update(volumes[volumes.length - 1])
-    }
-  }, [candles])
-
-  // EMA overlays
   useEffect(() => {
-    if (!chartRef.current || !candles.length) return
-    const chart = chartRef.current as {
-      addSeries: (def: unknown, opts: unknown) => { setData: (d: unknown) => void }
-    }
-    const LWSLineSeries = (chartRef as unknown as { lwsLineSeries: unknown }).lwsLineSeries
-    if (!LWSLineSeries) return
+    if (!chartRef.current || !lwsLineSeriesRef.current || !candles.length) return
+    const chart = chartRef.current
+    const LWSLineSeries = lwsLineSeriesRef.current
 
     const closes = candles.map(c => c.close)
     const times = candles.map(c => c.time)
+    const currentPrice = closes[closes.length - 1]
+
+    // Detect asset change: if price moved >50% from last range, clear overlays
+    if (lastPriceRangeRef.current > 0 && Math.abs(currentPrice - lastPriceRangeRef.current) / lastPriceRangeRef.current > 0.5) {
+      for (const [id, series] of overlaySeriesRef.current) {
+        try { chart.removeSeries(series) } catch {}
+      }
+      overlaySeriesRef.current.clear()
+    }
+    lastPriceRangeRef.current = currentPrice
 
     function computeEMASeries(period: number) {
       if (closes.length < period) return []
@@ -153,21 +189,17 @@ export default function Chart({ candles, results, setups, alertPrices = [] }: Pr
       if (!data.length) continue
       let lineSeries = overlaySeriesRef.current.get(id)
       if (!lineSeries) {
-        // v5 API: addSeries(SeriesDefinition, options)
         lineSeries = chart.addSeries(LWSLineSeries, { color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
         overlaySeriesRef.current.set(id, lineSeries)
       }
-      (lineSeries as { setData: (d: unknown) => void }).setData(data)
+      lineSeries.setData(data)
     }
   }, [candles])
 
   // Signal price lines + alerts
   useEffect(() => {
     if (!candleSeriesRef.current) return
-    const series = candleSeriesRef.current as {
-      createPriceLine: (opts: unknown) => unknown
-      removePriceLine: (line: unknown) => void
-    }
+    const series = candleSeriesRef.current
 
     for (const { line } of priceLinesRef.current) {
       try { series.removePriceLine(line) } catch {}

@@ -1,7 +1,7 @@
 {
-  "name": "Crypto Terminal",
-  "short_name": "CryptoTerm",
-  "description": "Professional crypto trading terminal",
+  "name": "Trading Terminal",
+  "short_name": "TradeTerm",
+  "description": "Professional trading terminal with live data",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#060e1a",

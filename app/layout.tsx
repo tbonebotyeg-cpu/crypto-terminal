@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import BottomNav from '../components/BottomNav'
 
 export const metadata: Metadata = {
-  title: 'Crypto Terminal',
-  description: 'Professional crypto trading terminal with live indicators and trade signals',
+  title: 'Trading Terminal',
+  description: 'Professional trading terminal with live indicators, calculators, and trade signals',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Crypto Terminal',
+    title: 'Trading Terminal',
   },
   other: {
     'mobile-web-app-capable': 'yes',
@@ -26,7 +27,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="h-full">
-      <body className="h-full overflow-hidden">{children}</body>
+      <body className="h-full bg-[#060e1a] text-slate-200">
+        <main className="pb-14 h-full overflow-y-auto">{children}</main>
+        <BottomNav />
+      </body>
     </html>
   )
 }

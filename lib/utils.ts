@@ -36,7 +36,7 @@ export function stdDev(values: number[], period: number): number {
   if (values.length < period) return NaN
   const slice = values.slice(-period)
   const mean = slice.reduce((a, b) => a + b, 0) / period
-  const variance = slice.reduce((a, b) => a + (b - mean) ** 2, 0) / period
+  const variance = slice.reduce((a, b) => a + (b - mean) ** 2, 0) / (period - 1)
   return Math.sqrt(variance)
 }
 

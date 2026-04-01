@@ -1,6 +1,6 @@
 'use client'
 
-type Tab = 'chart' | 'indicators' | 'trades' | 'alerts'
+type Tab = 'chart' | 'indicators' | 'trades' | 'alerts' | 'watchlist'
 
 interface Props {
   activeTab: Tab
@@ -8,6 +8,7 @@ interface Props {
 }
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
+  { id: 'watchlist', label: 'Watch', icon: '👁' },
   { id: 'chart', label: 'Chart', icon: '📈' },
   { id: 'indicators', label: 'Signals', icon: '⚡' },
   { id: 'trades', label: 'Trades', icon: '🎯' },

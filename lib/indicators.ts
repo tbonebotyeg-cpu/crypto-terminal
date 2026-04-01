@@ -69,8 +69,10 @@ export function calcSMA20(candles: Candle[]): IndicatorResult {
 }
 
 export function calcVWAP(candles: Candle[]): IndicatorResult {
-  let cumTPV = 0, cumVol = 0
+  let cumTPV = 0, cumVol = 0, lastDay = -1
   for (const c of candles) {
+    const day = Math.floor(c.time / 86400)
+    if (day !== lastDay) { cumTPV = 0; cumVol = 0; lastDay = day }
     const tp = (c.high + c.low + c.close) / 3
     cumTPV += tp * c.volume
     cumVol += c.volume
@@ -84,7 +86,7 @@ export function calcVWAP(candles: Candle[]): IndicatorResult {
 }
 
 export function calcSupertrend(candles: Candle[]): IndicatorResult {
-  const period = 7
+  const period = 10
   const mult = 3.0
   if (candles.length < period + 1) return { id: 'supertrend', name: 'Supertrend', group: 'trend', value: NaN, label: 'ST: N/A', ...neut() }
   const closes = candles.map(c => c.close)
@@ -173,15 +175,9 @@ export function calcStochRSI(candles: Candle[]): IndicatorResult {
   }
 
   if (stoch.length < 5) return { id: 'stochRsi', name: 'Stoch RSI', group: 'momentum', value: 50, label: 'StochRSI: N/A', ...neut() }
-  const kVals: number[] = []
-  for (let i = 2; i < stoch.length; i++) {
-    kVals.push((stoch[i - 2] + stoch[i - 1] + stoch[i]) / 3)
-  }
+  const kVals = ema(stoch, 3)
   if (kVals.length < 3) return { id: 'stochRsi', name: 'Stoch RSI', group: 'momentum', value: 50, label: 'StochRSI: N/A', ...neut() }
-  const dVals: number[] = []
-  for (let i = 2; i < kVals.length; i++) {
-    dVals.push((kVals[i - 2] + kVals[i - 1] + kVals[i]) / 3)
-  }
+  const dVals = ema(kVals, 3)
 
   const k = kVals[kVals.length - 1]
   const d = dVals[dVals.length - 1]
@@ -301,7 +297,7 @@ export function calcKeltner(candles: Candle[]): IndicatorResult {
   const highs = candles.map(c => c.high)
   const lows = candles.map(c => c.low)
   const mid = emaLast(closes, 20)
-  const atrVal = atr(highs, lows, closes, 14)
+  const atrVal = atr(highs, lows, closes, 20)
   const upper = mid + 2 * atrVal
   const lower = mid - 2 * atrVal
   const price = closes[closes.length - 1]
