@@ -44,11 +44,14 @@ export async function GET(req: NextRequest) {
       throw new Error('Unknown provider')
     }
 
-    // Snap last candle close to live price
+    // Snap last candle close to live price, keeping high/low valid
     if (candles.length && stats.price) {
+      const last = candles[candles.length - 1]
       candles[candles.length - 1] = {
-        ...candles[candles.length - 1],
+        ...last,
         close: stats.price,
+        high: Math.max(last.high, stats.price),
+        low: Math.min(last.low, stats.price),
       }
     }
 
