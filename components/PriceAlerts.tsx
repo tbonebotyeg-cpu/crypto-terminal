@@ -22,12 +22,14 @@ const STORAGE_KEY = 'crypto-terminal-alerts'
 export default function PriceAlerts({ asset, currentPrice, onAlertsChange }: Props) {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [input, setInput] = useState('')
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default')
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) setAlerts(JSON.parse(stored))
     } catch {}
+    if ('Notification' in window) setNotifPermission(Notification.permission)
   }, [])
 
   useEffect(() => {
@@ -63,11 +65,33 @@ export default function PriceAlerts({ asset, currentPrice, onAlertsChange }: Pro
     setInput('')
   }
 
+  async function requestNotifPermission() {
+    if (!('Notification' in window)) return
+    const result = await Notification.requestPermission()
+    setNotifPermission(result)
+  }
+
+  function clearTriggered() {
+    setAlerts(prev => prev.filter(a => !a.triggered))
+  }
+
   const assetAlerts = alerts.filter(a => a.asset === asset)
+  const triggeredCount = assetAlerts.filter(a => a.triggered).length
 
   return (
     <div className="bg-[#0a1628] border border-[#1e3a5f] rounded-lg p-4">
-      <h2 className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider mb-3">Price Alerts</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">Price Alerts</h2>
+        {triggeredCount > 0 && (
+          <button
+            onClick={clearTriggered}
+            data-testid="clear-triggered-alerts"
+            className="text-[10px] font-mono text-slate-500 hover:text-red-400 transition-colors"
+          >
+            Clear triggered ({triggeredCount})
+          </button>
+        )}
+      </div>
 
       <div className="flex gap-2 mb-3">
         <input
@@ -77,9 +101,11 @@ export default function PriceAlerts({ asset, currentPrice, onAlertsChange }: Pro
           onKeyDown={e => e.key === 'Enter' && addAlert()}
           placeholder={`Alert price${currentPrice ? ` (now $${currentPrice.toFixed(0)})` : ''}`}
           className="flex-1 bg-[#0d1829] border border-[#1e3a5f] text-slate-200 placeholder-slate-600 font-mono text-xs px-3 py-2 rounded focus:outline-none focus:border-cyan-500"
+          data-testid="alert-price-input"
         />
         <button
           onClick={addAlert}
+          data-testid="add-alert"
           className="px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/40 rounded text-xs font-mono transition-colors"
         >
           Add
@@ -108,12 +134,18 @@ export default function PriceAlerts({ asset, currentPrice, onAlertsChange }: Pro
         </div>
       )}
 
-      <button
-        onClick={() => 'Notification' in window && Notification.requestPermission()}
-        className="mt-3 text-[10px] font-mono text-slate-500 hover:text-slate-300 underline"
-      >
-        Enable browser notifications
-      </button>
+      <div className="mt-3 flex items-center justify-between">
+        {notifPermission !== 'granted' ? (
+          <button
+            onClick={requestNotifPermission}
+            className="text-[10px] font-mono text-slate-500 hover:text-slate-300 underline"
+          >
+            {notifPermission === 'denied' ? 'Notifications blocked' : 'Enable browser notifications'}
+          </button>
+        ) : (
+          <span className="text-[10px] font-mono text-emerald-600">Notifications enabled</span>
+        )}
+      </div>
     </div>
   )
 }

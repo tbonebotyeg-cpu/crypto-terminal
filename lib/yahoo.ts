@@ -8,6 +8,7 @@ export async function fetchYahooPrice(ticker: string): Promise<MarketStats> {
     next: { revalidate: 60 },
     headers: { 'User-Agent': 'Mozilla/5.0' },
   })
+  if (res.status === 429) throw new Error('Yahoo rate limited (429) — back off')
   if (!res.ok) throw new Error(`Yahoo ticker ${res.status}`)
   const json = await res.json()
   const meta = json.chart?.result?.[0]?.meta
@@ -28,6 +29,7 @@ export async function fetchYahooOHLCV(ticker: string, timeframe: Timeframe): Pro
     next: { revalidate: 60 },
     headers: { 'User-Agent': 'Mozilla/5.0' },
   })
+  if (res.status === 429) throw new Error('Yahoo OHLCV rate limited (429) — back off')
   if (!res.ok) throw new Error(`Yahoo OHLCV ${res.status}`)
   const json = await res.json()
   const result = json.chart?.result?.[0]
@@ -38,7 +40,7 @@ export async function fetchYahooOHLCV(ticker: string, timeframe: Timeframe): Pro
 
   let candles: Candle[] = []
   for (let i = 0; i < timestamps.length; i++) {
-    if (quote.open[i] == null || quote.close[i] == null) continue
+    if (quote.open[i] == null || quote.close[i] == null || quote.high[i] == null || quote.low[i] == null) continue
     candles.push({
       time: timestamps[i],
       open: quote.open[i],

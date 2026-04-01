@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 
 interface Props {
   currentPrice: number
@@ -11,6 +11,17 @@ export default function PositionCalc({ currentPrice, accountSize }: Props) {
   const [entry, setEntry] = useState('')
   const [stopLoss, setStopLoss] = useState('')
   const [riskPct, setRiskPct] = useState('1.5')
+
+  // Load saved risk % from settings
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('tt_default_risk')
+      if (saved !== null) {
+        const val = JSON.parse(saved)
+        if (typeof val === 'number' && val > 0) setRiskPct(String(val))
+      }
+    } catch {}
+  }, [])
 
   const calc = useMemo(() => {
     const e = parseFloat(entry) || currentPrice

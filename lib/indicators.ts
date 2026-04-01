@@ -138,10 +138,11 @@ export function calcRSI(candles: Candle[]): IndicatorResult {
   if (!rsiVals.length) return { id: 'rsi14', name: 'RSI (14)', group: 'momentum', value: 50, label: 'RSI: N/A', ...neut() }
   const rsi = rsiVals[rsiVals.length - 1]
   let ss: ReturnType<typeof bull>
-  if (rsi < 30) ss = bull(70)
-  else if (rsi > 70) ss = bear(70)
-  else if (rsi >= 40 && rsi <= 65) ss = bull(Math.abs(rsi - 50) * 2)
-  else ss = neut(30)
+  if (rsi < 30) ss = bull(70)         // oversold — bullish reversal
+  else if (rsi <= 45) ss = bear(40)   // weak — bearish
+  else if (rsi <= 55) ss = neut(30)   // mid-range — neutral
+  else if (rsi <= 70) ss = bull(Math.min((rsi - 55) * 4, 60))  // bullish momentum
+  else ss = bear(70)                  // overbought — bearish reversal
   return { id: 'rsi14', name: 'RSI (14)', group: 'momentum', value: rsi, label: `RSI: ${rsi.toFixed(1)}`, ...ss }
 }
 

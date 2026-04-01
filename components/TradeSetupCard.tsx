@@ -14,6 +14,14 @@ function fmtPrice(n: number): string {
   return n.toFixed(6)
 }
 
+function fmtAge(detectedAt: number): string {
+  const secs = Math.floor((Date.now() - detectedAt) / 1000)
+  if (secs < 60) return `${secs}s ago`
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m ago`
+  return `${Math.floor(mins / 60)}h ago`
+}
+
 export default function TradeSetupCard({ setup, expanded, onToggle }: Props) {
   const isLong = setup.direction === 'LONG'
   const dirStyles = isLong
@@ -40,6 +48,7 @@ export default function TradeSetupCard({ setup, expanded, onToggle }: Props) {
           <span className="text-xs font-mono text-slate-400">{setup.asset} · {setup.timeframe}</span>
         </div>
         <div className="flex items-center gap-3">
+          <span className="text-[10px] font-mono text-slate-500">{fmtAge(setup.detectedAt)}</span>
           <span className="text-xs font-mono text-slate-400">
             <span className="text-slate-200">{setup.winProbability.toFixed(0)}%</span> conf
           </span>
@@ -65,11 +74,25 @@ export default function TradeSetupCard({ setup, expanded, onToggle }: Props) {
             <div className="text-red-400">Stop Loss</div>
             <div className="text-red-400">${fmtPrice(setup.stopLoss)}</div>
 
-            <div className="text-slate-400">Confirming</div>
-            <div className="text-slate-200">{setup.confirmingCount}/{setup.totalIndicators} indicators</div>
+            <div className="text-slate-400">Confluence</div>
+            <div className="text-slate-200">{setup.confirmingCount}/{setup.totalIndicators}</div>
 
             <div className="text-slate-400">Position Size</div>
             <div className="text-slate-200">{(setup.positionSizePct * 100).toFixed(2)}% of account</div>
+          </div>
+
+          {/* Confluence progress bar */}
+          <div className="mt-1">
+            <div className="flex justify-between text-[9px] font-mono text-slate-600 mb-0.5">
+              <span>Confluence</span>
+              <span>{Math.round((setup.confirmingCount / setup.totalIndicators) * 100)}%</span>
+            </div>
+            <div className="h-1 bg-[#1e3a5f] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${isLong ? 'bg-emerald-500' : 'bg-red-500'}`}
+                style={{ width: `${(setup.confirmingCount / setup.totalIndicators) * 100}%` }}
+              />
+            </div>
           </div>
 
           {setup.isPremiumSetup && (

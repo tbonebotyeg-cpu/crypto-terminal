@@ -10,10 +10,17 @@ export async function fetchPrice(assets: Asset[]): Promise<Record<Asset, MarketS
   const fetches = assets.map(async (asset) => {
     const instrument = ASSET_REGISTRY[asset].instrumentName
     const url = `${CDC_BASE}/get-tickers?instrument_name=${instrument}`
-    const res = await fetch(url, { next: { revalidate: 60 } })
-    if (!res.ok) throw new Error(`CDC ticker ${res.status}: ${await res.text()}`)
+    let res: Response
+    try {
+      res = await fetch(url, { next: { revalidate: 60 } })
+    } catch (e) {
+      throw new Error(`CDC ticker network error for ${asset}: ${e}`)
+    }
+    if (res.status === 429) throw new Error(`CDC rate limited (429) for ${asset} — back off`)
+    if (!res.ok) throw new Error(`CDC ticker ${res.status} for ${asset}`)
     const json = await res.json()
     const data = json?.result?.data?.[0] ?? json?.data?.[0] ?? json
+    if (!data) throw new Error(`CDC ticker: no data for ${asset}`)
     const price = parseFloat(data.a ?? data.last ?? '0')  // 'a' = last trade price
     const change = parseFloat(data.c ?? data.change ?? '0') * 100 // 'c' = 24h change ratio
     const vol = parseFloat(data.v ?? data.volume ?? '0')  // 'v' = 24h volume
@@ -39,8 +46,14 @@ export async function fetchOHLCV(asset: Asset, timeframe: Timeframe): Promise<Ca
   const instrument = ASSET_REGISTRY[asset].instrumentName
   const tf = CRYPTO_COM_TIMEFRAMES[timeframe]
   const url = `${CDC_BASE}/get-candlestick?instrument_name=${instrument}&timeframe=${tf}&count=300`
-  const res = await fetch(url, { next: { revalidate: 60 } })
-  if (!res.ok) throw new Error(`CDC OHLCV ${res.status}: ${await res.text()}`)
+  let res: Response
+  try {
+    res = await fetch(url, { next: { revalidate: 60 } })
+  } catch (e) {
+    throw new Error(`CDC OHLCV network error for ${asset}: ${e}`)
+  }
+  if (res.status === 429) throw new Error(`CDC rate limited (429) for ${asset} OHLCV — back off`)
+  if (!res.ok) throw new Error(`CDC OHLCV ${res.status} for ${asset}`)
   const json = await res.json()
   const data = json?.result?.data ?? json?.data ?? []
 

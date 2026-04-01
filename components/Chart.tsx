@@ -30,7 +30,7 @@ type SeriesApi = {
   removePriceLine: (line: unknown) => void
 }
 
-export default function Chart({ candles, results, setups, alertPrices = [] }: Props) {
+export default function Chart({ candles, results, setups, alertPrices = [], asset }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<ChartApi | null>(null)
   const candleSeriesRef = useRef<SeriesApi | null>(null)
@@ -41,6 +41,7 @@ export default function Chart({ candles, results, setups, alertPrices = [] }: Pr
   const prevFirstTimeRef = useRef(0)
   const lwsLineSeriesRef = useRef<unknown>(null)
   const candlesRef = useRef<Candle[]>([])
+  const roRef = useRef<ResizeObserver | null>(null)
 
   // Keep candlesRef in sync
   candlesRef.current = candles
@@ -125,10 +126,13 @@ export default function Chart({ candles, results, setups, alertPrices = [] }: Pr
         }
       })
       ro.observe(containerRef.current)
+      roRef.current = ro
     })
 
     return () => {
       disposed = true
+      roRef.current?.disconnect()
+      roRef.current = null
       if (chartRef.current) {
         chartRef.current.remove()
         chartRef.current = null
@@ -146,8 +150,8 @@ export default function Chart({ candles, results, setups, alertPrices = [] }: Pr
     applyCandles(candles)
   }, [candles, applyCandles])
 
-  // EMA overlays — clear and rebuild when asset changes (detected by price range shift)
-  const lastPriceRangeRef = useRef(0)
+  // EMA overlays — clear and rebuild when asset changes
+  const lastAssetRef = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     if (!chartRef.current || !lwsLineSeriesRef.current || !candles.length) return
@@ -156,16 +160,15 @@ export default function Chart({ candles, results, setups, alertPrices = [] }: Pr
 
     const closes = candles.map(c => c.close)
     const times = candles.map(c => c.time)
-    const currentPrice = closes[closes.length - 1]
 
-    // Detect asset change: if price moved >50% from last range, clear overlays
-    if (lastPriceRangeRef.current > 0 && Math.abs(currentPrice - lastPriceRangeRef.current) / lastPriceRangeRef.current > 0.5) {
-      for (const [id, series] of overlaySeriesRef.current) {
+    // Clear overlays when asset changes
+    if (lastAssetRef.current !== undefined && lastAssetRef.current !== asset) {
+      for (const [, series] of overlaySeriesRef.current) {
         try { chart.removeSeries(series) } catch {}
       }
       overlaySeriesRef.current.clear()
     }
-    lastPriceRangeRef.current = currentPrice
+    lastAssetRef.current = asset
 
     function computeEMASeries(period: number) {
       if (closes.length < period) return []
@@ -194,7 +197,7 @@ export default function Chart({ candles, results, setups, alertPrices = [] }: Pr
       }
       lineSeries.setData(data)
     }
-  }, [candles])
+  }, [candles, asset])
 
   // Signal price lines + alerts
   useEffect(() => {

@@ -54,7 +54,7 @@ export function generateSimCandles(
 // Maps timeframe string to interval in seconds and candle count
 export function simParams(timeframe: string): { intervalSeconds: number; count: number } {
   switch (timeframe) {
-    case '15m': return { intervalSeconds: 30 * 60, count: 200 }
+    case '15m': return { intervalSeconds: 15 * 60, count: 200 }
     case '1H':  return { intervalSeconds: 60 * 60, count: 200 }
     case '4H':  return { intervalSeconds: 4 * 3600, count: 200 }
     case '1D':  return { intervalSeconds: 24 * 3600, count: 200 }

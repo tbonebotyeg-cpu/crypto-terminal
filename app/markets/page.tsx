@@ -20,6 +20,7 @@ import Watchlist from '../../components/Watchlist'
 import OrderBook from '../../components/OrderBook'
 import RecentTrades from '../../components/RecentTrades'
 import PositionCalc from '../../components/PositionCalc'
+import ComponentErrorBoundary from '../../components/ComponentErrorBoundary'
 
 const Chart = dynamic(() => import('../../components/Chart'), { ssr: false })
 
@@ -56,7 +57,10 @@ export default function MarketsPage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (e.key === 'Escape' && chartFullscreen) { setChartFullscreen(false); return }
+      if (e.key === 'Escape') {
+        if (settingsOpen) { setSettingsOpen(false); return }
+        if (chartFullscreen) { setChartFullscreen(false); return }
+      }
       if (e.key === 'f' || e.key === 'F') { setChartFullscreen(prev => !prev); return }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault()
@@ -73,7 +77,7 @@ export default function MarketsPage() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [asset, timeframe, chartFullscreen])
+  }, [asset, timeframe, chartFullscreen, settingsOpen])
 
   const MOBILE_TABS: { id: MobileTab; label: string; icon: string }[] = [
     { id: 'watchlist', label: 'Watch', icon: '👁' },
@@ -115,27 +119,32 @@ export default function MarketsPage() {
       <div className="flex-1 lg:overflow-hidden">
         {/* Desktop layout */}
         <div className="hidden lg:flex" style={{ height: 'calc(100vh - 10rem)' }}>
-          <Watchlist
-            items={watchlistItems}
-            watchlist={watchlist}
-            selected={asset}
-            onSelect={handleWatchlistSelect}
-            onAdd={addAsset}
-            onRemove={removeAsset}
-            collapsed={watchlistCollapsed}
-            onToggle={() => setWatchlistCollapsed(prev => !prev)}
-          />
+          <ComponentErrorBoundary name="Watchlist">
+            <Watchlist
+              items={watchlistItems}
+              watchlist={watchlist}
+              selected={asset}
+              onSelect={handleWatchlistSelect}
+              onAdd={addAsset}
+              onRemove={removeAsset}
+              collapsed={watchlistCollapsed}
+              onToggle={() => setWatchlistCollapsed(prev => !prev)}
+            />
+          </ComponentErrorBoundary>
 
           <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${chartFullscreen ? 'absolute inset-0 z-40 bg-[#060e1a]' : ''}`}>
             <div className="relative flex-shrink-0 p-3" style={{ height: chartFullscreen ? '100%' : '55%' }}>
               <button
                 onClick={() => setChartFullscreen(prev => !prev)}
+                data-testid="chart-fullscreen-toggle"
                 className="absolute top-5 right-5 z-10 px-2 py-1 bg-[#0d1829]/80 border border-[#1e3a5f] text-slate-400 hover:text-cyan-400 hover:border-cyan-700 rounded text-[10px] font-mono transition-colors backdrop-blur-sm"
                 title={chartFullscreen ? 'Exit fullscreen' : 'Fullscreen chart'}
               >
                 {chartFullscreen ? '✕ EXIT' : '⛶ FULL'}
               </button>
-              <Chart candles={market.candles} results={results} setups={setups} alertPrices={alertPrices} currentPrice={currentPrice} />
+              <ComponentErrorBoundary name="Chart">
+                <Chart candles={market.candles} results={results} setups={setups} alertPrices={alertPrices} currentPrice={currentPrice} asset={asset} />
+              </ComponentErrorBoundary>
             </div>
             {!chartFullscreen && (
               <div className="flex-1 overflow-y-auto p-3 pt-0">
@@ -145,8 +154,12 @@ export default function MarketsPage() {
           </div>
 
           <div className="w-80 flex-shrink-0 flex flex-col gap-3 p-3 overflow-y-auto border-l border-[#1e3a5f]">
-            <TradeSignalPanel setups={setups} />
-            <OrderBook asset={asset} currentPrice={currentPrice} />
+            <ComponentErrorBoundary name="TradeSignalPanel">
+              <TradeSignalPanel setups={setups} />
+            </ComponentErrorBoundary>
+            <ComponentErrorBoundary name="OrderBook">
+              <OrderBook asset={asset} currentPrice={currentPrice} />
+            </ComponentErrorBoundary>
             <RecentTrades asset={asset} />
             <PositionCalc currentPrice={currentPrice} accountSize={accountSize} />
             <PriceAlerts asset={asset} currentPrice={currentPrice} onAlertsChange={handleAlertsChange} />

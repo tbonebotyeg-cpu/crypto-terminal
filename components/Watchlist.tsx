@@ -113,8 +113,24 @@ export default function Watchlist({ items, watchlist, selected, onSelect, onAdd,
             </div>
           )
         })}
+        {items.length === 0 && watchlist.length === 0 && (
+          <div className="px-3 py-6 text-center">
+            <p className="text-xs font-mono text-slate-600">No assets in watchlist</p>
+            <p className="text-[10px] font-mono text-slate-700 mt-1">Click + to add assets</p>
+          </div>
+        )}
         {items.length === 0 && watchlist.length > 0 && (
-          <div className="px-3 py-4 text-xs text-slate-600 text-center font-mono">Loading...</div>
+          <div className="space-y-px">
+            {watchlist.map(a => (
+              <div key={a} className="flex items-center justify-between px-3 py-2">
+                <div className="space-y-1.5">
+                  <div className="h-2.5 w-10 rounded bg-[#1e3a5f] animate-pulse" />
+                  <div className="h-2 w-16 rounded bg-[#1e3a5f]/60 animate-pulse" />
+                </div>
+                <div className="h-2 w-8 rounded bg-[#1e3a5f]/40 animate-pulse" />
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

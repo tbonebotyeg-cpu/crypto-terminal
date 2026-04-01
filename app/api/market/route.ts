@@ -6,6 +6,8 @@ import { Asset, Timeframe, ASSET_REGISTRY, MarketStats, Candle } from '../../../
 
 export const runtime = 'nodejs'
 
+const VALID_TIMEFRAMES: Timeframe[] = ['15m', '1H', '4H', '1D', '1W', '1M']
+
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const asset = (searchParams.get('asset') ?? 'BTC') as Asset
@@ -14,6 +16,10 @@ export async function GET(req: NextRequest) {
 
   if (!config) {
     return NextResponse.json({ error: 'Unknown asset' }, { status: 400 })
+  }
+
+  if (!VALID_TIMEFRAMES.includes(timeframe)) {
+    return NextResponse.json({ error: `Invalid timeframe. Valid: ${VALID_TIMEFRAMES.join(', ')}` }, { status: 400 })
   }
 
   try {

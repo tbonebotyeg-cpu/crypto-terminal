@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Asset, AssetCategory, ASSET_REGISTRY, AssetConfig } from '../types/market'
 
 const CATEGORY_LABELS: Record<AssetCategory, string> = {
@@ -26,6 +26,11 @@ export default function AssetSelector({ selected, onSelect, stats }: Props) {
   const selectedCategory = ASSET_REGISTRY[selected]?.category ?? 'crypto'
   const [category, setCategory] = useState<AssetCategory>(selectedCategory)
 
+  // Sync category tab when selected asset changes externally (e.g. keyboard nav)
+  useEffect(() => {
+    setCategory(ASSET_REGISTRY[selected]?.category ?? 'crypto')
+  }, [selected])
+
   return (
     <div className="flex items-center gap-2">
       {/* Category tabs */}
@@ -34,6 +39,7 @@ export default function AssetSelector({ selected, onSelect, stats }: Props) {
           <button
             key={cat}
             onClick={() => setCategory(cat)}
+            data-testid={`category-tab-${cat}`}
             className={`px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-all ${
               cat === category
                 ? 'bg-cyan-500/20 text-cyan-400'
@@ -55,6 +61,7 @@ export default function AssetSelector({ selected, onSelect, stats }: Props) {
             <button
               key={cfg.symbol}
               onClick={() => onSelect(cfg.symbol)}
+              data-testid={`asset-btn-${cfg.symbol}`}
               className={`px-2.5 py-1.5 rounded text-xs font-mono transition-all whitespace-nowrap flex-shrink-0 ${
                 isSelected
                   ? 'bg-cyan-500/20 border border-cyan-500 text-cyan-400'

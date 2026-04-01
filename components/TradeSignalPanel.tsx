@@ -12,7 +12,7 @@ export default function TradeSignalPanel({ setups }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   return (
-    <div className="bg-[#0a1628] border border-[#1e3a5f] rounded-lg p-4">
+    <div className="bg-[#0a1628] border border-[#1e3a5f] rounded-lg p-4" data-testid="trade-signal-panel">
       <h2 className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider mb-3">
         Trade Signals
         {setups.length > 0 && (

@@ -27,7 +27,19 @@ export default function SettingsPage() {
     setDefaultLeverage(loadSetting('tt_default_leverage', 1))
   }, [])
 
+  const [errors, setErrors] = useState<string[]>([])
+
+  function validate(): boolean {
+    const errs: string[] = []
+    if (!accountSize || accountSize <= 0) errs.push('Account size must be greater than 0')
+    if (defaultRisk < 0.1 || defaultRisk > 100) errs.push('Risk % must be between 0.1 and 100')
+    if (defaultLeverage < 1 || defaultLeverage > 1000) errs.push('Leverage must be between 1 and 1000')
+    setErrors(errs)
+    return errs.length === 0
+  }
+
   function handleSave() {
+    if (!validate()) return
     saveSetting('tt_account_size', accountSize)
     saveSetting('tt_default_risk', defaultRisk)
     saveSetting('tt_default_leverage', defaultLeverage)
@@ -108,9 +120,18 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      {errors.length > 0 && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+          {errors.map((e, i) => (
+            <p key={i} className="text-xs font-mono text-red-400">{e}</p>
+          ))}
+        </div>
+      )}
+
       {/* Save */}
       <button
         onClick={handleSave}
+        data-testid="settings-save"
         className={`w-full py-2.5 rounded text-sm font-mono font-bold transition-colors ${
           saved
             ? 'bg-emerald-500/20 border border-emerald-500 text-emerald-400'
